@@ -3,7 +3,7 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import { CreateUserDto } from './dto/create-user';
 import {hash} from 'bcrypt'
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime';
-
+import { Tokens } from './types/token.types';
 @Injectable()
 export class AuthService {
     constructor(private prisma: PrismaService) {}
@@ -18,6 +18,7 @@ export class AuthService {
                 }
             })
             return user
+            // console.log({user})
         }catch(e) {
             if(e instanceof PrismaClientKnownRequestError) {
                 if(e.code === 'P2002') {
