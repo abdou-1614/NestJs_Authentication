@@ -1,11 +1,12 @@
 import { ForbiddenException, Injectable } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { CreateUserDto } from './dto/create-user';
-import {hash} from 'bcrypt'
+import {compare, hash} from 'bcrypt'
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime';
 import { Tokens } from './types/token.types';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
+import { LoginDto } from './dto/login-user';
 @Injectable()
 export class AuthService {
     constructor(private prisma: PrismaService,
@@ -30,7 +31,7 @@ export class AuthService {
             }
         }
 
-    async signup(input: CreateUserDto) {
+    async signup(input: CreateUserDto): Promise<Tokens> {
         const hashed = await hash(input.password, 12)
         try{
             const user = await this.prisma.user.create({
@@ -41,6 +42,7 @@ export class AuthService {
             })
             const payload = {sub: user.id, email: user.email}
            const tokens = await this.getTokens(payload)
+           await this.updateRtHash(user.id, tokens.refresh_token)
            return tokens
         }catch(e) {
             if(e instanceof PrismaClientKnownRequestError) {
@@ -51,7 +53,35 @@ export class AuthService {
         }
     }
 
-    async login() {}
+    async updateRtHash(userId: string, rt: string){
+        const hashed = await hash(rt, 12)
+        await this.prisma.user.update({
+            where: {
+                id: userId
+            },
+            data: {
+                hashedRt: hashed
+            }
+        })
+    }
+
+    async login(input: LoginDto): Promise<Tokens> {
+        const {email, password} = input
+        const user = await this.prisma.user.findUnique({
+            where: {
+                email
+            }
+        })
+        if(!user) throw new ForbiddenException('access denied')
+        const isPassword = await compare(password, user.hash)
+        if(!isPassword) {
+            throw new ForbiddenException('access denied')
+        }
+        const payload = {sub: user.id, email: user.email}
+        const tokens = await this.getTokens(payload)
+        await this.updateRtHash(user.id, tokens.refresh_token)
+        return tokens
+    }
 
     async logout() {}
 
