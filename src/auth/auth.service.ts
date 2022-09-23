@@ -83,7 +83,32 @@ export class AuthService {
         return tokens
     }
 
-    async logout() {}
+    async logout(userId: string) {
+        await this.prisma.user.updateMany({
+            where: {
+                id: userId,
+                hashedRt: {
+                    not: null
+                }
+            },
+            data: {
+                hashedRt: null
+            }
+        })
+    }
 
-    async refreshtoken() {}
+    async refreshtoken(userId: string, rt: string) {
+        const user = await this.prisma.user.findUnique({
+            where: {
+                id: userId
+            }
+        })
+        if(!user) throw new ForbiddenException('Access Denied')
+        const validRt = await compare(rt, user.hashedRt)
+        if(!validRt) throw new ForbiddenException('Access Denied')
+        const payload = {sub: user.id, email: user.email}
+        const tokens = await this.getTokens(payload)
+        await this.updateRtHash(user.id, tokens.refresh_token)
+        return tokens
+    }
 }
