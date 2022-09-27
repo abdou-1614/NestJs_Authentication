@@ -103,7 +103,7 @@ export class AuthService {
                 id: userId
             }
         })
-        if(!user) throw new ForbiddenException('Access Denied')
+        if(!user || user.hashedRt ) throw new ForbiddenException('Access Denied')
         const validRt = await compare(rt, user.hashedRt)
         if(!validRt) throw new ForbiddenException('Access Denied')
         const payload = {sub: user.id, email: user.email}
